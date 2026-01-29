@@ -1,0 +1,12 @@
+streamlit               # สร้างหน้าเว็บแชทบอท
+pandas                  # จัดการข้อมูลตาราง
+numpy                   # คำนวณเวกเตอร์
+python-dotenv           # อ่านไฟล์ตั้งค่า (.env)
+psycopg2-binary         # เชื่อมต่อฐานข้อมูล PostgreSQL
+langchain               # ระบบจัดการ AI และ RAG หลัก
+langchain-community     # เครื่องมือเสริมของ LangChain
+langchain-openai        # เชื่อมต่อ API (Typhoon)
+openai                  # ส่งข้อมูลหา AI Model
+supabase                # เชื่อมต่อฐานข้อมูลสำรอง
+sentence-transformers   # โมเดลแปลงข้อความเป็นเวกเตอร์ (BGE-M3)
+torch                   # ตัวประมวลผลโมเดล AI (จำเป็นสำหรับ Embedding)
