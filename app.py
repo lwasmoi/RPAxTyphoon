@@ -74,11 +74,11 @@ if "accepted_terms" not in st.session_state:
     show_disclaimer()
     
 
-# เช็คว่ามี session_id หรือยัง? ถ้ายังไม่มีค่อยสร้าง
+# เช็คว่ามี session_id  ถ้ายังไม่มีค่อยสร้าง
 if "session_id" not in st.session_state:
     st.session_state.session_id = uuid.uuid4().hex[:4]
 
-RETRIEVE_TOPK = 12
+RETRIEVE_TOPK = 20
 RERANK_TOPK = 8
 TYPE_THRESH = {
     "fact": 0.38,           # ความจริง/ตัวเลข 

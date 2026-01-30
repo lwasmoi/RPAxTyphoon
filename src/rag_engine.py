@@ -157,7 +157,7 @@ Output: วิธีแก้ไขปัญหาการเข้าสู่
 # Retrieval Stage 
 def retrieval_stage(
     query: str, target_data: List[Dict[str, Any]], target_vectors: np.ndarray,
-    top_k: int = 30, mmr: bool = True, mmr_lambda: float = 0.90  # <--- แก้ตรงนี้: จาก 0.70 เป็น 0.90
+    top_k: int = 20, mmr: bool = True, mmr_lambda: float = 0.90  
 ) -> List[Dict[str, Any]]:
     
     if not target_data or target_vectors is None or len(target_data) == 0:
@@ -239,7 +239,7 @@ TYPE_WEIGHTS = {
 
 @traceable(run_type="chain", name="Reranking Calculation")
 def reranking_stage(
-    query: str, candidates: List[Dict[str, Any]], top_k: int = 10, intent: str = "QUERY" 
+    query: str, candidates: List[Dict[str, Any]], top_k: int = 8, intent: str = "QUERY" 
 ) -> List[Tuple[Dict[str, Any], float]]:
     
     if not candidates: return []
@@ -258,10 +258,10 @@ def reranking_stage(
         # Base Score จาก Vector
         score = float(c.get("vector_score", 0.0)) * 100.0
         
-        # 1. Type Boost
+        #  Type Boost
         score *= TYPE_WEIGHTS.get(dtype, 1.0)  
         
-        # 2. Topic/Name Match 
+        #  Topic/Name Match 
         topic_val = str(meta.get("topic") or meta.get("name") or "")
         topic = _safe_lower(topic_val).replace(" ", "")
         
