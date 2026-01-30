@@ -79,17 +79,6 @@ Determine whether the input is:
 - A complete question
 - A follow-up referring to previous context
 
-Examples:
-Complete:
-- "เข้า RPA ยังไง"
-- "FF fund คืออะไร"
-- "Error 404"
-
-Follow-up:
-- "แล้วอีกอันล่ะ"
-- "มันยังไม่ได้"
-- "ใช้เอกสารอะไรบ้าง"
-
 --------------------------------
 Step 2: Detect Topic Shift (CRITICAL)
 
@@ -102,15 +91,24 @@ IF the input uses pronouns or depends on context:
 IF Last Bot Message is empty:
 → Use ONLY current input.
 
-Never merge unrelated topics.
+--------------------------------
+Step 3: Apply Domain Terminology (CRITICAL FIX)
+
+1. "ทุน" (Fund) Context:
+   - "ทุน" ALWAYS means "Research Grant/Fund" (ทุนวิจัย).
+   - NEVER rewrite "ทุน" as "Scholarship" (ทุนการศึกษา) unless user explicitly mentions "student" or "study".
+   
+2. Abbreviations:
+   - FF -> Fundamental Fund
+   - SF -> Strategic Fund
+   - PM -> Project Manager / หัวหน้าโครงการ
 
 --------------------------------
-Step 3: Refine Query
+Step 4: Refine Query
 
 - Fix spelling and grammar
-- Expand abbreviations (FF, SF, RPA, etc.)
-- Convert vague words into explicit terms
-- Preserve technical terms
+- Convert vague words into explicit terms (e.g., "ขอตังค์" -> "การเบิกจ่ายงบประมาณ")
+- Preserve technical terms (RPA, Login, Error)
 - Use natural Thai language
 
 --------------------------------
@@ -126,10 +124,15 @@ OUTPUT RULES (MANDATORY)
 Format:
 [Intent] + [System/Feature] + [Problem/Condition]
 
-Example Output:
-การเข้าสู่ระบบ RPA ไม่ได้ แสดง error 404
-เอกสารที่ใช้ในการสมัครกองทุน Fundamental Fund
-วิธีแก้ไขระบบ RPA โหลดหน้า login ไม่สำเร็จ
+Examples:
+Input: "ขอทุนยากไหม"
+Output: ขั้นตอนและเกณฑ์การขอรับทุนวิจัย (Research Fund)
+
+Input: "FF คือไร"
+Output: รายละเอียดกองทุน Fundamental Fund
+
+Input: "เข้าไม่ได้" (Context: Login)
+Output: วิธีแก้ไขปัญหาการเข้าสู่ระบบ RPA ไม่สำเร็จ
 """
 
     try:
@@ -154,12 +157,11 @@ Example Output:
 # Retrieval Stage 
 def retrieval_stage(
     query: str, target_data: List[Dict[str, Any]], target_vectors: np.ndarray,
-    top_k: int = 20, mmr: bool = True, mmr_lambda: float = 0.70 
+    top_k: int = 30, mmr: bool = True, mmr_lambda: float = 0.90  # <--- แก้ตรงนี้: จาก 0.70 เป็น 0.90
 ) -> List[Dict[str, Any]]:
     
     if not target_data or target_vectors is None or len(target_data) == 0:
         return []
-
 
     # ส่ง vector ไปหา
     qvec = embedding.get_embedding_remote(query)
@@ -169,9 +171,10 @@ def retrieval_stage(
     sims = np.dot(target_vectors, qvec)
     
     # ดึงทั้งหมด
-    pool_k = min(len(target_data), max(top_k * 2, 50))
+    pool_k = min(len(target_data), max(top_k * 2, 70))
     top_idx = np.argsort(sims)[::-1][:pool_k]
-    #เก็บข้อมูลคู่กับคะแนน
+    
+    # เก็บข้อมูลคู่กับคะแนน
     cand = []
     for idx in top_idx:
         cand.append({
@@ -192,6 +195,8 @@ def retrieval_stage(
 
     if not mmr or len(cand) <= top_k:
         return cand[:top_k]
+        
+    # MMR Logic
     selected = [cand[0]]
     selected_idx = [0]
     pool_vecs = target_vectors[[c["idx"] for c in cand]]
@@ -201,11 +206,18 @@ def retrieval_stage(
         best_idx = -1
         for i in range(len(cand)):
             if i in selected_idx: continue
+            
+            # คะแนนความเหมือนกับคำถาม (Relevance)
             sim_q = cand[i]["vector_score"]
+            
+            # คะแนนความเหมือนกับสิ่งที่เลือกไปแล้ว (Redundancy)
             sel_vecs = pool_vecs[selected_idx]
             curr_vec = pool_vecs[i]            
             sim_sel = np.max(np.dot(sel_vecs, curr_vec)) if len(sel_vecs) > 0 else 0
+            
+            # สูตร MMR: ถ้า Lambda สูง (0.9) จะสนใจ sim_q มากกว่า (ยอมให้ซ้ำได้บ้าง)
             mmr_score = (mmr_lambda * sim_q) - ((1 - mmr_lambda) * sim_sel)
+            
             if mmr_score > best_mmr:
                 best_mmr = mmr_score
                 best_idx = i
@@ -215,54 +227,76 @@ def retrieval_stage(
             selected_idx.append(best_idx)
         else:
             break
+            
     return selected
 
-
 # Reranking Stage 
-
 
 TYPE_WEIGHTS = {
     "fact": 1.10, "definition": 1.05,
     "guide": 1.25, "troubleshoot": 1.15, "info": 1.00,
 }
+
 @traceable(run_type="chain", name="Reranking Calculation")
 def reranking_stage(
-    query: str, candidates: List[Dict[str, Any]], top_k: int = 8, intent: str = "QUERY" 
+    query: str, candidates: List[Dict[str, Any]], top_k: int = 10, intent: str = "QUERY" 
 ) -> List[Tuple[Dict[str, Any], float]]:
     
     if not candidates: return []
+    
     # Normalizing Query
     q_norm = _safe_lower(query).replace(" ", "") 
     reranked = []
+    
     for c in candidates:
         item = c["data"]
-        content = _get_content(item)
-        dtype = _get_type(item)
+        # _get_content, _get_type ต้องแน่ใจว่า import มาแล้ว หรือมีฟังก์ชันอยู่จริง
+        # ถ้าไม่มี ให้ใช้ item.get("content","") แทนได้
+        dtype = (item.get("type") or "info").lower() 
         meta = item.get("metadata", {}) or {}
+        
         # Base Score จาก Vector
         score = float(c.get("vector_score", 0.0)) * 100.0
-        # Type Boost
-        score *= TYPE_WEIGHTS.get(dtype, 1.1)  
-        # Topic/Name Match 
-        topic = _safe_lower(str(meta.get("topic") or meta.get("name") or "")).replace(" ", "")
+        
+        # 1. Type Boost
+        score *= TYPE_WEIGHTS.get(dtype, 1.0)  
+        
+        # 2. Topic/Name Match 
+        topic_val = str(meta.get("topic") or meta.get("name") or "")
+        topic = _safe_lower(topic_val).replace(" ", "")
+        
         if len(topic) > 2 and (topic in q_norm or q_norm in topic):
             score += 30.0  
-        # Step Match
+            
+        # 3. Step Match
         m = re.search(r"(ขั้นตอน|step)\s*(ที่)?\s*(\d+)", query)
         if m:
             want_step = int(m.group(3))
             step_no = meta.get("step_number")
-            if step_no and int(step_no) == want_step: score += 60.0 
-            elif step_no: score -= 20.0
-        # Fund Match 
+            if step_no and int(step_no) == want_step: 
+                score += 60.0 
+            elif step_no: 
+                score -= 20.0 # ถ้าถามขั้นตอน 1 แต่เจอขั้นตอน 5 ให้ลดคะแนน
+                
+        # 4. Fund Match (Abbreviation)
         fund_abbr = _safe_lower(str(meta.get("fund_abbr") or " "))
-        if fund_abbr and fund_abbr in q_norm: 
+        if fund_abbr.strip() and fund_abbr in q_norm: 
             score += 30.0 
+            
+        # 5. Status Match (แก้บั๊กตรงนี้!) ----------------------------------
         if dtype == "fact":  
             status_val = str(meta.get("status", "")).strip().lower()
-            active_keywords = ['y', 'yes', 'enable', 'active', 'true', '1','Active','ทำงาน']
-            if status_val in active_keywords:
-                score += 30.0  
+            
+            # แก้ list นี้เป็นตัวเล็กทั้งหมด + เพิ่มคำไทย
+            active_keywords = [
+                'y', 'yes', 'enable', 'active', 'true', '1', 'on', 
+                'open', 'working', 'ปกติ', 'เปิด', 'ทำงาน', 'อนุมัติ'
+            ]
+            
+            # ใช้การเช็คว่า "มีคำนี้อยู่ใน status_val ไหม" (ครอบคลุมกว่า ==)
+            if any(k in status_val for k in active_keywords):
+                score += 30.0
+        # ----------------------------------------------------------------
             
         item["metadata"]["final_rerank_score"] = score
         reranked.append((item, score))

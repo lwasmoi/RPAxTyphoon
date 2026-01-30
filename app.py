@@ -182,18 +182,17 @@ st.divider()
 
 
 # CSS STYLING
-
 st.markdown("""
 <style>
-    /* จัดโครงสร้างหน้าเว็บหลัก */
+    /* 1 จัดโครงสร้างหน้าเว็บหลัก */
     .block-container { 
         max-width: 950px;
         padding-top: 2rem;
-        padding-bottom: 2rem;
+        padding-left: 2.5rem;
         margin: auto;
     }
 
-    /* ปุ่มคำถามแนะนำ */
+    /* 2 ปุ่มคำถามแนะนำ */
     div.stButton > button {
         width: 220px; height: 70px;
         border-radius: 20px;
@@ -209,7 +208,7 @@ st.markdown("""
         transform: translateY(-4px); box-shadow: 0 10px 20px rgba(0, 0, 0, 0.1); color: #0f172a;
     }
 
-    /* ปุ่มเมนู Popover */
+    /* 3 ปุ่มเมนู Popover */
     [data-testid="stPopover"] > button {
         height: 50px; min-height: 50px; width: auto; 
         border-radius: 25px; padding: 0 25px;
@@ -218,59 +217,78 @@ st.markdown("""
         display: inline-flex; justify-content: center;
     }
     [data-testid="stPopover"] > button:hover { color: #3b82f6; background: #f8fafc; }
-
-    /* ช่องพิมพ์ข้อความ */
-    [data-testid="stChatInput"] {
-        border-radius: 24px; background-color: #ffffff; 
-        border: 1px solid #e2e8f0; box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05); padding: 5px;
-    }
-
-    /* Transparent Header*/
-    div[data-testid="stVerticalBlock"] > div:has(div[data-testid="stHorizontalBlock"]):first-child {
-        position: sticky;
-        top: 3.7rem;
-        background-color: transparent !important; 
-        backdrop-filter: none !important;
-        z-index: 999;
-        border: none !important;
-        box-shadow: none !important;
-        padding-top: 0px;
-        padding-bottom: 0px;
-        pointer-events: none; 
-    }
     
-    div[data-testid="stVerticalBlock"] > div:has(div[data-testid="stHorizontalBlock"]):first-child button {
-        pointer-events: auto !important;
+    /* ขยายกล่องขาวรองรับ */
+    [data-testid="stChatInput"] {
+        border-radius: 30px !important; 
+        background-color: #ffffff; 
+        border: 1px solid #e2e8f0; 
+        box-shadow: 0 6px 16px rgba(0, 0, 0, 0.08); 
+        padding: 10px !important; /* เพิ่มพื้นที่ภายใน */
     }
 
-    /* ปุ่มเริ่มใหม่ */
+    /* ขยายตัวหนังสือตอนพิมพ์ */
+    [data-testid="stChatInput"] textarea {
+        font-size: 1.2rem !important;  /* ตัวหนังสือใหญ่ขึ้น (ประมาณ 19px) */
+        line-height: 1.5 !important;
+    }
+
     div.stButton > button[kind="primary"] {
-        background: #ffffff !important; 
-        border: none !important; 
-        box-shadow: none !important;
-        color: #ef4444 !important;
+        position: fixed !important;     
+        top: 75px !important;           
+        right: 45px !important;         
+        z-index: 99999 !important;      
         
-        height: auto !important;
+        /* ปรับขนาดให้ใหญ่ขึ้นตรงนี้ */
+        font-size: 18px !important;      /* ตัวหนังสือใหญ่ */
+        padding: 12px 24px !important;   /* ขอบปุ่มกว้างขึ้น */
+        font-weight: bold !important;
+        
+        background-color: #ffffff !important;
+        color: #ef4444 !important;
+        border: 2px solid #fee2e2 !important; /* ขอบหนาขึ้นนิดนึง */
+        box-shadow: 0px 6px 12px rgba(0,0,0,0.1) !important;
+        border-radius: 12px !important;
         width: auto !important;
-        font-size: 14px !important;
-        font-weight: 600 !important;
-        padding: 15px 10px !important;
-        margin-top: 10px !important;
-        float: right !important;
+        height: auto !important;
+        margin-top: 0px !important;
     }
     
     div.stButton > button[kind="primary"]:hover {
-        background: rgba(255, 255, 255, 0.8) !important;
-        color: #dc2626 !important;
-        transform: scale(1.05);
-        border-radius: 8px !important;
+        background-color: #fef2f2 !important;
+        color: #b91c1c !important;
+        border-color: #ef4444 !important;
+        transform: scale(1.05) !important;
+    }
+
+    div[role="dialog"] button[kind="primary"],
+    div[data-testid="stModal"] button[kind="primary"] {
+        position: static !important;    
+        top: auto !important;           
+        right: auto !important;         
+        z-index: 1 !important;          
+        transform: none !important;     
+        
+        font-size: 16px !important;
+        padding: 8px 16px !important;
+        border: none !important;
+        
+        width: 100% !important;
+        margin-top: 10px !important;
+        background-color: #ff4b4b !important; 
+        color: white !important;
+        box-shadow: none !important;
+    }
+    
+    div[role="dialog"] button[kind="primary"]:hover,
+    div[data-testid="stModal"] button[kind="primary"]:hover {
+        background-color: #ff3333 !important;
     }
 
     hr { display: none !important; }
     [data-testid="column"] { padding: 0 4px; }
 </style>
 """, unsafe_allow_html=True)
-
 
 
 # CHAT DISPLAY & FEEDBACK
