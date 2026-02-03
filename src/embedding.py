@@ -6,8 +6,11 @@ import config
 
 # ตั้งค่า Timeout 
 TIMEOUT = httpx.Timeout(45.0, connect=10.0, read=45.0)
-HTTP = httpx.Client(timeout=TIMEOUT, headers={"Content-Type": "application/json"})
-
+HTTP = httpx.Client(
+    timeout=TIMEOUT, 
+    headers={"Content-Type": "application/json"},
+    verify=False 
+)
 def _normalize(vec: np.ndarray) -> np.ndarray:
     n = np.linalg.norm(vec)
     if n == 0:
