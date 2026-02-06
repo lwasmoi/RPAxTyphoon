@@ -1,6 +1,23 @@
+# 1. ห้ามเอา Virtual Environment เข้าไป (ตัวการใหญ่สุด)
+venv/
+.venv/
+env/
+
+# 2. ห้ามเอา Git History เข้าไป
 .git/
 .gitignore
-venv/
+
+# 3. ห้ามเอา Python Cache เข้าไป
 __pycache__/
 *.pyc
+*.pyo
+*.pyd
+
+# 4. ห้ามเอาไฟล์ Database หรือไฟล์ข้อมูลใหญ่ๆ เข้าไป (ควรใช้ Volume Mount หรือโหลดแยก)
+*.db
+*.sqlite3
+data/*.csv  # (ถ้าไฟล์ data-xxxx.csv ใหญ่มาก ไม่ควร build ฝังลง image)
+*.log
+
+# 5. ห้ามเอาไฟล์ Env ส่วนตัวเข้าไป (เพื่อความปลอดภัย)
 .env

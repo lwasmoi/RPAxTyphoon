@@ -100,7 +100,6 @@ Step 3: Apply Domain Terminology (CRITICAL FIX)
    
 2. Abbreviations:
    - FF -> Fundamental Fund
-   - SF -> Strategic Fund
    - PM -> Project Manager / หัวหน้าโครงการ
 
 --------------------------------
@@ -233,8 +232,7 @@ def retrieval_stage(
 # Reranking Stage 
 
 TYPE_WEIGHTS = {
-    "fact": 1.10, "definition": 1.05,
-    "guide": 1.25, "troubleshoot": 1.15, "info": 1.00,
+    "definition": 1.05,"guide": 1.25, "troubleshoot": 1.15, "info": 1.00,"contact" : 1.20,"warning": 1.15,
 }
 
 @traceable(run_type="chain", name="Reranking Calculation")
@@ -250,8 +248,6 @@ def reranking_stage(
     
     for c in candidates:
         item = c["data"]
-        # _get_content, _get_type ต้องแน่ใจว่า import มาแล้ว หรือมีฟังก์ชันอยู่จริง
-        # ถ้าไม่มี ให้ใช้ item.get("content","") แทนได้
         dtype = (item.get("type") or "info").lower() 
         meta = item.get("metadata", {}) or {}
         

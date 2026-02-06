@@ -13,26 +13,99 @@ from langsmith import traceable
 
 st.set_page_config(
     page_title="น้องทุน AI",
-    page_icon="🤖",
     layout="centered", 
     initial_sidebar_state="collapsed", 
 )
 hide_streamlit_style = """
 <style>
-    /* ซ่อนปุ่ม 3 จุดด้านขวาบน (Hamburger Menu) */
+    /* ซ่อนส่วนเกิน */
     #MainMenu {visibility: hidden;}
-    
-    /* ซ่อนแถบสีด้านบนสุด (Header) */
     header {visibility: hidden;}
-    
-    /* ซ่อน Footer ด้านล่าง (Make with Streamlit) */
     footer {visibility: hidden;}
-    
-    /* (แถม) ซ่อนปุ่ม Deploy ถ้ามี */
     .stDeployButton {display:none;}
+
+    /* STYLE สำหรับปุ่ม ?  */
+    .restart-tooltip-container {
+        position: fixed;
+        top: 35px;          /* ปรับให้ตรงกับแนวปุ่ม */
+        right: 180px;       /* ปรับให้ห่างจากปุ่มเริ่มใหม่ (อยู่ทางซ้ายของปุ่ม) */
+        z-index: 999999;    /* ให้อยู่บนสุด */
+    }
+    
+    .tooltip-icon {
+        background: #f8fafc;
+        color: #94a3b8;
+        width: 24px; 
+        height: 24px;
+        border-radius: 50%;
+        text-align: center;
+        line-height: 24px;
+        font-weight: bold;
+        font-size: 14px;
+        border: 1px solid #cbd5e1;
+        cursor: help;
+        box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+        transition: all 0.2s;
+    }
+    
+    .tooltip-icon:hover {
+        background: #ffffff;
+        color: #ef4444; /* เปลี่ยนเป็นสีแดงตอนชี้ */
+        border-color: #fca5a5;
+    }
+
+    /* กล่องข้อความที่จะเด้งขึ้นมา */
+    .tooltip-text {
+        visibility: hidden;
+        width: 160px;
+        background-color: #334155;
+        color: #fff;
+        text-align: center;
+        border-radius: 8px;
+        padding: 8px 12px;
+        position: absolute;
+        z-index: 1;
+        top: 130%; /* ให้เด้งอยู่ข้างล่างไอคอน */
+        left: 50%;
+        margin-left: -80px; /* จัดกึ่งกลาง */
+        
+        /* Effect */
+        opacity: 0;
+        transition: opacity 0.3s;
+        font-size: 12px;
+        font-weight: normal;
+        box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+    }
+    
+    /* ลูกศรชี้ขึ้นของกล่องข้อความ */
+    .tooltip-text::after {
+        content: "";
+        position: absolute;
+        bottom: 100%;
+        left: 50%;
+        margin-left: -5px;
+        border-width: 5px;
+        border-style: solid;
+        border-color: transparent transparent #334155 transparent;
+    }
+
+    /* โชว์เมื่อเอาเมาส์ชี้ */
+    .restart-tooltip-container:hover .tooltip-text {
+        visibility: visible;
+        opacity: 1;
+    }
 </style>
 """
 st.markdown(hide_streamlit_style, unsafe_allow_html=True)
+
+
+st.markdown("""
+    <div class="restart-tooltip-container">
+        <div class="tooltip-icon">?</div>
+        <span class="tooltip-text">กดปุ่มนี้เมื่อต้องการ<br>เริ่มหัวข้อใหม่</span>
+    </div>
+""", unsafe_allow_html=True)
+
 
 @st.dialog("ข้อตกลงการใช้งาน")
 def show_disclaimer():
@@ -52,13 +125,13 @@ def show_disclaimer():
             }
         </style>
         """, unsafe_allow_html=True)
-    st.write("ระบบนี้เป็น AI สำหรับช่วยตอบคำถามงานวิจัยและงบประมาณเบื้องต้นเท่านั้น")
-    st.warning("ข้อมูลที่ได้จาก AI อาจมีความคลาดเคลื่อน กรุณาตรวจสอบกับระเบียบฉบับจริงหรือเจ้าหน้าที่อีกครั้ง")
+    st.write("ระบบนี้เป็น AI สำหรับช่วยตอบคำถามการเบิกเงินและใบเสร็จ")
+    st.warning("กรุณากดปุ่ม  'เริ่มใหม่'  หากต้องการเริ่มคุยหัวข้อใหม่")
     
     button_placeholder = st.empty()
 
     if "disclaimer_timer_done" not in st.session_state:
-        for i in range(5, 0, -1):
+        for i in range(1, 0, -1):
             button_placeholder.button(f"กรุณาอ่านเงื่อนไข... ({i})", disabled=True, key=f"wait_{i}")
             time.sleep(1)
         
@@ -115,7 +188,6 @@ except Exception as e:
 def decide_log_sources(collected_data):
     final_sources = []
     
-    # เพิ่มตัวแปร Debug ให้รองรับ s3 และ gap ใหม่
     debug_info = {
         "s1": 0, "s2": 0, "s3": 0,
         "gap_12": 0, "gap_23": 0,
@@ -123,13 +195,11 @@ def decide_log_sources(collected_data):
     }
 
     if collected_data:
-        # มีแค่ 1 อัน เก็บเลย
         if len(collected_data) == 1:
             final_sources.append(collected_data[0][0])
             debug_info["s1"] = collected_data[0][1]
             debug_info["decision"] = "Single Item Found"
             
-        # มีหลายอัน
         else:
             s1 = collected_data[0][1] 
             s2 = collected_data[1][1] 
@@ -229,24 +299,23 @@ st.markdown("""
 
     /* ขยายตัวหนังสือตอนพิมพ์ */
     [data-testid="stChatInput"] textarea {
-        font-size: 1.2rem !important;  /* ตัวหนังสือใหญ่ขึ้น (ประมาณ 19px) */
+        font-size: 1.2rem !important;  /* ตัวหนังสือใหญ่ขึ้น */
         line-height: 1.5 !important;
     }
 
     div.stButton > button[kind="primary"] {
         position: fixed !important;     
-        top: 75px !important;           
+        top: 20px !important;           
         right: 45px !important;         
         z-index: 99999 !important;      
         
-        /* ปรับขนาดให้ใหญ่ขึ้นตรงนี้ */
-        font-size: 18px !important;      /* ตัวหนังสือใหญ่ */
-        padding: 12px 24px !important;   /* ขอบปุ่มกว้างขึ้น */
+        font-size: 24px !important;     
+        padding: 12px 30px !important;   
         font-weight: bold !important;
         
         background-color: #ffffff !important;
         color: #ef4444 !important;
-        border: 2px solid #fee2e2 !important; /* ขอบหนาขึ้นนิดนึง */
+        border: 2px solid #fee2e2 !important; 
         box-shadow: 0px 6px 12px rgba(0,0,0,0.1) !important;
         border-radius: 12px !important;
         width: auto !important;
@@ -318,7 +387,7 @@ for msg in st.session_state.messages:
 
 suggestions = [
     {"label": "ขอคู่มือการขอเบิกเงิน", "query": "ขอคู่มือการขอเบิกเงินทดรองจ่าย"},
-    {"label": "ขอคู่มือการอัปโหลดใบเสร็จ", "query": "ขอคู่มือการอัปโหลดใบเสร็จตั้งแต่ขั้นตอนแรก"},
+    {"label": "ขอคู่มือการอัปโหลดใบเสร็จ", "query": "คู่มือการอัปโหลดใบเสร็จในระบบ RPA ตั้งแต่ขั้นตอนแรกจนถึงขั้นตอนสุดท้าย"},
     {"label": "เข้าสู่ระบบไม่ได้", "query": "เข้าสู่ระบบไม่ได้"},
     {"label": "รหัสใบเสร็จRPA คืออะไร", "query": "รหัสใบเสร็จRPA คืออะไร"}
 ]
