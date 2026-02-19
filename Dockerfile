@@ -5,16 +5,22 @@ FROM python:3.9-slim
 ENV PYTHONDONTWRITEBYTECODE=1
 ENV PYTHONUNBUFFERED=1
 
-# Dependency พื้นฐาน
+# ตั้งค่า Timezone ให้เป็นเวลาไทย
+ENV TZ=Asia/Bangkok
+
+# เพิ่ม libpq-dev สำหรับ psycopg2 และ tzdata สำหรับจัดการ Timezone
 RUN apt-get update && apt-get install -y \
     build-essential \
     curl \
+    libpq-dev \
+    tzdata \
+    && ln -snf /usr/share/zoneinfo/$TZ /etc/localtime && echo $TZ > /etc/timezone \
     && rm -rf /var/lib/apt/lists/*
 
 # Working directory
 WORKDIR /app
 
-# Copy requirements ก่อน (เพื่อ cache layer)
+# Copy requirements ก่อน เพื่อ cache layer
 COPY requirements.txt .
 
 # Install dependencies

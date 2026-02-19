@@ -5,8 +5,12 @@ import uuid
 from openai import OpenAI
 import config
 from src import data_loader, embedding, rag_engine
+import datetime
 from langsmith.wrappers import wrap_openai
 from langsmith import traceable
+from apscheduler.schedulers.background import BackgroundScheduler
+import requests
+from src import db_actions 
 
 
 # SETUP PAGE & SESSION 
@@ -107,6 +111,62 @@ st.markdown("""
 """, unsafe_allow_html=True)
 
 
+
+
+def get_db_metadata_time():
+    try:
+        db_time = data_loader.get_sync_metadata() 
+        return db_time
+    except Exception as e:
+        print(f"Metadata Fetch Error: {e}")
+        return datetime.datetime.now().strftime("%Y-%m-%d")
+
+@st.cache_resource(show_spinner=False) 
+def setup_system(day_key, force_refresh=False): 
+    client = wrap_openai(OpenAI(api_key=config.CURRENT_KEY, base_url=config.CURRENT_URL))
+    all_data = data_loader.load_knowledge(day_key) 
+    all_vecs = embedding.build_vector_store(all_data, config.CACHE_JSON, force_refresh=force_refresh)
+    return client, all_data, all_vecs
+
+
+def daily_sync_job():
+    print("--- [APScheduler] Starting Daily Sync ---")
+    try:
+        success = db_actions.confirm_sync_metadata()
+        if success:
+
+            # เคลียร์ cache เก่าออก
+            st.cache_resource.clear() 
+            print("[INFO] Global Cache cleared.")
+            
+            # โหลด Data ใหม่
+            new_ver = str(get_db_metadata_time())
+            print(f"Metadata updated. Background Loading: {new_ver}")
+            _ = setup_system(new_ver, force_refresh=True) 
+            
+            # ยิงเข้าเว็บ
+            # target_url = "http://rpaxai.urmo.psu.ac.th/alpha/"
+            target_url = "http://localhost:8501/"
+            try:
+                requests.get(target_url, timeout=5)
+                print(f"Warm-up signal sent to {target_url}")
+            except Exception as e:
+                print(f"[WARN] Warm-up signal failed: {e}")
+                
+            print("--- [SUCCESS] Sync & Pre-load Complete ---")
+    except Exception as e:
+        print(f"Sync error: {e}")
+        
+@st.cache_resource
+def init_scheduler():
+    scheduler = BackgroundScheduler(timezone="Asia/Bangkok")
+    scheduler.add_job(daily_sync_job, 'interval', minutes=2)
+    scheduler.start()
+    return scheduler
+
+_ = init_scheduler()        
+        
+
 @st.dialog("ข้อตกลงการใช้งาน")
 def show_disclaimer():
     st.markdown("""
@@ -131,7 +191,7 @@ def show_disclaimer():
     button_placeholder = st.empty()
 
     if "disclaimer_timer_done" not in st.session_state:
-        for i in range(1, 0, -1):
+        for i in range(1, 0, -5):
             button_placeholder.button(f"กรุณาอ่านเงื่อนไข... ({i})", disabled=True, key=f"wait_{i}")
             time.sleep(1)
         
@@ -169,19 +229,13 @@ def get_threshold(item_type: str) -> float:
 def set_ask(txt):
     st.session_state.prompt_trigger = txt.replace("\n", " ")
 
-@st.cache_resource(show_spinner="กำลังโหลดฐานข้อมูล... กรุณารอสักครู่")
-def setup_system():
-    # Wrap OpenAI Client
-    client = wrap_openai(OpenAI(api_key=config.CURRENT_KEY, base_url=config.CURRENT_URL))
-    
-    all_data = data_loader.load_supabase_knowledge()
-    all_vecs = embedding.build_vector_store(all_data, config.CACHE_JSON)
-    return client, all_data, all_vecs
 
 try:
-    client, all_data, all_vecs = setup_system()
+    current_db_ver = str(get_db_metadata_time()) 
+    client, all_data, all_vecs = setup_system(current_db_ver, force_refresh=False)
 except Exception as e:
-    st.error(f"System Load Error: {e}"); st.stop()
+    st.error(f"System Load Error: {e}")
+    st.stop()
 
 
 @traceable(run_type="chain", name="Decision Logic")

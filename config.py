@@ -4,8 +4,6 @@ from dotenv import load_dotenv
 load_dotenv()
 
 # config.py
-
-
 ACTIVE_MODE = os.getenv("ACTIVE_MODE","CLOUD")
 
 UNI_KEY = os.getenv("UNI_KEY")
@@ -55,7 +53,6 @@ thai_months = [
     "มกราคม", "กุมภาพันธ์", "มีนาคม", "เมษายน", "พฤษภาคม", "มิถุนายน",
     "กรกฎาคม", "สิงหาคม", "กันยายน", "ตุลาคม", "พฤศจิกายน", "ธันวาคม"
 ]
-# แปลง ค.ศ. เป็น พ.ศ. (+543)
 current_date_str = f"{now.day} {thai_months[now.month-1]} {now.year + 543}"
 
 STATIC_SYS_PROMPT = f"""
@@ -112,7 +109,7 @@ but you must NOT provide informational or advisory content outside of the domain
 5. **STRICT PROHIBITION:** - Do NOT output Chinese characters. 
    - Even if the underlying model logic suggests a Chinese phrase, you must OVERRIDE it with Thai.
    - Use English ONLY for technical terms (e.g., 'Login', 'Error', 'RPA').
-6. **NO CALCULATIONS, NO DATE ARITHMETIC & NO DURATION SUMMATION:**
+6. **NO CALCULATIONS, NO DATE ARITHMETIC & NO DURATION SUMMATION (CRITICAL):**
    - **DO NOT** perform any mathematical calculations (e.g., summing totals, calculating percentages).
    - **DO NOT** add or subtract days/months to dates (e.g., if the rule says "within 30 days", state exactly "ต้องดำเนินการภายใน 30 วัน", DO NOT attempt to calculate the specific deadline date).
    - **STRICTLY PROHIBITED:** Do NOT sum up time durations from different steps to create a "Total Estimated Time" (e.g., do NOT combine "1-2 days" and "3-4 days" to say "Total 4-6 days"). State only the duration of each step individually as written in the text.

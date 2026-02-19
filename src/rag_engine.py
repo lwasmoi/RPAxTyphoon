@@ -43,7 +43,7 @@ def rewrite_query(user_query: str, chat_history, client=None, model_name: str = 
     if not uq: return uq
     if not client or not model_name: return uq
 
-    is_long_query = len(uq) > 100 or len(uq.split()) > 20
+    is_long_query = len(uq) > 50 or len(uq.split()) > 10
     last_context = ""
     if chat_history and not is_long_query:
         for msg in reversed(chat_history):
@@ -51,10 +51,9 @@ def rewrite_query(user_query: str, chat_history, client=None, model_name: str = 
             content = msg.get("content", "")
             if role == "assistant":
                 if "ขออภัยค่ะ" not in content and "ไม่พบข้อมูล" not in content:
-                    last_context = content[:300] 
+                    last_context = content[:100] 
                     break
     else:
-        # ถ้าคำถามยาว ให้ print log ไว้ดูหน่อยว่าเราตัด context ทิ้งนะ
         if is_long_query:
             print(f"   [Rewriter] Long query detected ({len(uq)} chars). Ignore History.")
 
@@ -103,14 +102,6 @@ Step 3: Apply Domain Terminology (CRITICAL FIX)
    - PM -> Project Manager / หัวหน้าโครงการ
 
 --------------------------------
-Step 4: Refine Query
-
-- Fix spelling and grammar
-- Convert vague words into explicit terms (e.g., "ขอตังค์" -> "การเบิกจ่ายงบประมาณ")
-- Preserve technical terms (RPA, Login, Error)
-- Use natural Thai language
-
---------------------------------
 OUTPUT RULES (MANDATORY)
 
 - Output ONLY ONE single-line Thai search query
@@ -132,6 +123,9 @@ Output: รายละเอียดกองทุน Fundamental Fund
 
 Input: "เข้าไม่ได้" (Context: Login)
 Output: วิธีแก้ไขปัญหาการเข้าสู่ระบบ RPA ไม่สำเร็จ
+
+Input: "ขอคู่มือการขอเบิกเงินทดรองจ่าย"
+Output: อธิบายขั้นตอนการเบิกเงินทดรองจ่ายทั้งหมด
 """
 
     try:
@@ -141,7 +135,7 @@ Output: วิธีแก้ไขปัญหาการเข้าสู่
                 {"role": "system", "content": system_prompt},
                 {"role": "user", "content": f"User Input: {uq}"} 
             ],
-            temperature=0.1, 
+            temperature=0.2, 
             max_tokens=1500,
         )
         new_query = resp.choices[0].message.content.strip().replace('"', "")
@@ -274,25 +268,22 @@ def reranking_stage(
             elif step_no: 
                 score -= 20.0 # ถ้าถามขั้นตอน 1 แต่เจอขั้นตอน 5 ให้ลดคะแนน
                 
-        # 4. Fund Match (Abbreviation)
+        # Fund Match 
         fund_abbr = _safe_lower(str(meta.get("fund_abbr") or " "))
         if fund_abbr.strip() and fund_abbr in q_norm: 
             score += 30.0 
             
-        # 5. Status Match (แก้บั๊กตรงนี้!) ----------------------------------
+        # Status Match
         if dtype == "fact":  
             status_val = str(meta.get("status", "")).strip().lower()
             
-            # แก้ list นี้เป็นตัวเล็กทั้งหมด + เพิ่มคำไทย
             active_keywords = [
                 'y', 'yes', 'enable', 'active', 'true', '1', 'on', 
                 'open', 'working', 'ปกติ', 'เปิด', 'ทำงาน', 'อนุมัติ'
             ]
             
-            # ใช้การเช็คว่า "มีคำนี้อยู่ใน status_val ไหม" (ครอบคลุมกว่า ==)
             if any(k in status_val for k in active_keywords):
                 score += 30.0
-        # ----------------------------------------------------------------
             
         item["metadata"]["final_rerank_score"] = score
         reranked.append((item, score))

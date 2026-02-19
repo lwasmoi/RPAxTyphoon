@@ -9,3 +9,6 @@ openai
 supabase
 langsmith
 httpx
+apscheduler
+pytz
+requests

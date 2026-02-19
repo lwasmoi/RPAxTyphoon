@@ -95,67 +95,63 @@ def get_embedding_remote(text: str, retries: int = 3) -> np.ndarray:
     return np.array([], dtype="float32")
 
 def build_vector_store(data_list, cache_file=None, force_refresh=False):
-    """สร้าง Vector Database โดยไล่ทำทีละรายการ"""
     if not data_list:
         return None
 
-    # ลองโหลดจาก Cache ก่อน
+    
     if not force_refresh and cache_file and os.path.exists(cache_file):
         try:
             vectors = np.load(cache_file)
-            # เช็คว่าจำนวนแถวตรงกันไหม
-            if vectors.ndim == 2 and vectors.shape[0] == len(data_list):
-                print(f"[INFO] Loaded vectors from cache: {cache_file} (Shape: {vectors.shape})")
-                return vectors.astype("float32")
-            else:
-                print(f"[WARN] Cache mismatch (Data: {len(data_list)} vs Cache: {vectors.shape[0]}). Rebuilding...")
-        except Exception as e:
-            print(f"[WARN] Cache load failed: {e}, rebuilding...")
+            print(f"[INFO] Loaded vectors from cache: {cache_file}")
+            return vectors.astype("float32")
+        except:
+            pass
 
-    print(f"[INFO] Building vectors via API ({config.UNI_EMBED_MODEL}) for {len(data_list)} items...")
+    print(f"[INFO] Building vectors for {len(data_list)} items...")
     
-    # หา Dimension จากข้อมูลตัวแรก (Dynamic Dimension Detection)
-    first_content = data_list[0].get("content", "")
-    first_vec = get_embedding_remote(first_content)
+    first_vec = np.array([])
+    idx_start = 0
+    for i, item in enumerate(data_list):
+        content = item.get("content", "").strip()
+        if content:
+            first_vec = get_embedding_remote(content)
+            if first_vec.size > 0:
+                idx_start = i
+                break
     
     if first_vec.size == 0:
-        print("[ERROR] Failed to get embedding for the first item. Aborting.")
+        print("[ERROR] API Error: Cannot get initial embedding dimension. Aborting.")
         return None
         
     embed_dim = first_vec.shape[0]
-    print(f"   - Detected Dimension: {embed_dim}")
-
-    # จองพื้นที่ Memory (Zero Array)
     vectors = np.zeros((len(data_list), embed_dim), dtype="float32")
-    vectors[0] = first_vec # ใส่ตัวแรกที่หามาแล้วลงไป
+    
+    # ใส่ค่าตัวแรกที่หาเจอลงในตำแหน่งที่ถูกต้อง
+    vectors[idx_start] = first_vec
 
-    # วนลูปทำตัวที่เหลือ
+    # วนลูปทำที่เหลือ
     start_time = time.time()
-    for i in range(1, len(data_list)):
-        # แสดง Progress ทุกๆ 25 ตัว
+    for i in range(len(data_list)):
+        if i == idx_start: continue 
+        
         if i % 25 == 0:
-            elapsed = time.time() - start_time
-            print(f"   Processing {i}/{len(data_list)} ({elapsed:.1f}s)...", end="\r")
+            print(f"   Processing {i}/{len(data_list)}...", end="\r")
         
         content = data_list[i].get("content", "")
-        vec = get_embedding_remote(content)
+        if not content.strip(): continue 
         
-        # Safety Check: ถ้าได้ Vector มาไม่ครบ หรือ Error ให้เป็น 0 ไว้ก่อน
+        vec = get_embedding_remote(content)
         if vec.size == embed_dim:
             vectors[i] = vec
-        else:
-            # ปล่อยให้เป็น 0 (Row of zeros) เพื่อไม่ให้โปรแกรมพัง
-            pass 
 
-    total_time = time.time() - start_time
-    print(f"\n[INFO] Embedding complete. Total time: {total_time:.1f}s")
-    
-    # บันทึก Cache
+    # บันทึก Cache 
     if cache_file:
-        try:
-            np.save(cache_file, vectors)
-            print(f"[INFO] Saved cache to: {cache_file}")
-        except Exception as e:
-            print(f"[ERROR] Failed to save cache: {e}")
+        
+        temp_file = f"{cache_file}"
+        np.save(temp_file, vectors)
+        
+        os.replace(temp_file, cache_file) 
+        
+        print(f"\n[INFO] Saved and replaced cache successfully: {cache_file}")
 
     return vectors

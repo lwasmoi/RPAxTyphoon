@@ -3,7 +3,6 @@ import psycopg2
 from psycopg2.extras import RealDictCursor
 import config
 
-# ฟังก์ชันเชื่อมต่อ Database
 def get_db_connection():
     try:
         conn = psycopg2.connect(
@@ -18,10 +17,32 @@ def get_db_connection():
         print(f"[ERROR] DB Connection Failed: {e}")
         return None
 
-def load_supabase_knowledge():
-    # เปลี่ยนแค่ข้อความ Log เล็กน้อยเพื่อให้รู้ว่าต่อ DB ไหน
+
+# ดึงค่าเวลา last_updated จากตาราง metadata เพื่อเช็คเวอร์ชันข้อมูล
+def get_sync_metadata():
+    conn = get_db_connection()
+    if conn:
+        try:
+            with conn.cursor() as cur:
+                # ดึงเวลาจากตารางที่เราสร้างไว้
+                cur.execute(f"SELECT last_updated FROM {config.DB_SCHEMA}.system_metadata WHERE key = 'bot_sync_status'")
+                res = cur.fetchone()
+                return res[0] if res else None
+        except Exception as e:
+            print(f"[ERROR] Fetch Metadata Failed: {e}")
+            return None
+        finally:
+            conn.close()
+    return None
+
+
+def load_knowledge(day_key=None): 
     knowledge_base = []
-    print("[INFO] Gathering ALL data from PostgreSQL...")
+    
+    if day_key:
+        print(f"[INFO]  System Sync Triggered! Using Key: {day_key}")
+    else:
+        print("[INFO] Gathering ALL data from PostgreSQL...")
 
     knowledge_base.extend(fetch_rpa_manuals())       
     knowledge_base.extend(fetch_funds())                 
@@ -38,7 +59,6 @@ def fetch_rpa_manuals():
     chunks = []
     try:
         with conn.cursor(cursor_factory=RealDictCursor) as cur:
-            # ดึงข้อมูลจาก View ตาม Logic เดิม
             cur.execute(f"SELECT * FROM {config.DB_SCHEMA}.view_rpa_manuals")
             rows = cur.fetchall()
             
@@ -95,10 +115,8 @@ def fetch_funds():
             rows = cur.fetchall()
 
             for row in rows:
-                # ดึงค่าดิบจาก DB และแปลงเป็นสถานะมาตรฐาน 
                 raw_status = str(row.get("status", "")).strip().lower()
                 
-                # เช็คว่าใช่สถานะเปิดหรือไม่ 
                 if raw_status in ['y','yes', 'enable', 'active', 'true', '1','Y']:
                     std_status = "active"
                 else:
@@ -108,12 +126,11 @@ def fetch_funds():
                 fund_name = (row.get("fund_name_th") or row.get("fund_name_en") or "").strip()
                 fiscal_year = str(row.get("fiscal_year", ""))
 
-                # สร้าง Content ตามสถานะ
                 if std_status == "active":
                     content = (
                         f"ทุนวิจัย: {fund_name} ({fund_abbr})\n"
                         f"ปีงบประมาณ: {fiscal_year}\n"
-                        f"สถานะทุน: 🟢 ทำงาน)\n"
+                        f"สถานะทุน: 🟢 ทำงาน\n"
                         f"แหล่งทุน: {row.get('source_agency','')}\n"
                         f"ช่วงเวลา: {row.get('start_period','')} ถึง {row.get('end_period','')}"
                     )
@@ -122,7 +139,7 @@ def fetch_funds():
                         f"[SYSTEM WARNING: ข้อมูลสถานะทุน]\n"
                         f"ทุนวิจัย: {fund_name} ({fund_abbr})\n"
                         f"สถานะปัจจุบัน: 🔴 ยุติการทำงาน\n"
-                        f"ปีงบประมาณ: {fiscal_year}\n..."
+                        f"ปีงบประมาณ: {fiscal_year}\n"
                     )
 
                 chunks.append({
@@ -189,8 +206,8 @@ def fetch_troubleshooting_chunked():
             rows = cur.fetchall()
             
             for s in rows:
-                story_id = s.get("id") or s.get("story_id")
-                scenario = (s.get("problem") or "").strip()
+                story_id = s.get("id")
+                scenario = (s.get("scenario") or "").strip()
                 solution = (s.get("solution") or "").strip()
                 category_name = s.get("category_name")
 
@@ -214,7 +231,7 @@ def fetch_troubleshooting_chunked():
         return []
     finally:
         conn.close()
-
+        
 def _safe_id(s: str) -> str:
     s = (s or "").strip()
     s = re.sub(r"\s+", "_", s)
@@ -226,7 +243,6 @@ def save_chat_log(session_id: str, user_input: str, ai_response: str, source: st
     if not conn: return None
     try:
         with conn.cursor() as cur:
-            # ใช้ SQL Insert แทน Supabase Method
             sql = f"""
                 INSERT INTO {config.DB_SCHEMA}.chat_logs 
                 (session_id, user_input, ai_response, relevant_source) 
@@ -235,7 +251,7 @@ def save_chat_log(session_id: str, user_input: str, ai_response: str, source: st
             """
             cur.execute(sql, (session_id, user_input, ai_response, source))
             new_id = cur.fetchone()[0]
-            conn.commit() # Postgres ต้อง commit
+            conn.commit() 
             return new_id
     except Exception as e:
         print(f"[ERROR] Save Log Failed: {e}")
@@ -249,7 +265,6 @@ def update_feedback(log_id: int, score: int):
     if not conn or not log_id: return
     try:
         with conn.cursor() as cur:
-            # ใช้ SQL Update
             sql = f"UPDATE {config.DB_SCHEMA}.chat_logs SET feedback_score = %s WHERE id = %s"
             cur.execute(sql, (score, log_id))
             conn.commit()
@@ -258,4 +273,3 @@ def update_feedback(log_id: int, score: int):
         conn.rollback()
     finally:
         conn.close()
-        
