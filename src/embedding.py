@@ -147,7 +147,7 @@ def build_vector_store(data_list, cache_file=None, force_refresh=False):
     # บันทึก Cache 
     if cache_file:
         
-        temp_file = f"{cache_file}"
+        temp_file = f"{cache_file}.tmp.npy"
         np.save(temp_file, vectors)
         
         os.replace(temp_file, cache_file) 
