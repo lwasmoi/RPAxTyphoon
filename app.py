@@ -145,8 +145,8 @@ def daily_sync_job():
             _ = setup_system(new_ver, force_refresh=True) 
             
             # ยิงเข้าเว็บ
-            # target_url = "http://rpaxai.urmo.psu.ac.th/alpha/"
-            target_url = "http://localhost:8501/"
+            target_url = "http://rpaxai.urmo.psu.ac.th/alpha/"
+            # target_url = "http://localhost:8501/"
             try:
                 requests.get(target_url, timeout=5)
                 print(f"Warm-up signal sent to {target_url}")
@@ -160,7 +160,7 @@ def daily_sync_job():
 @st.cache_resource
 def init_scheduler():
     scheduler = BackgroundScheduler(timezone="Asia/Bangkok")
-    scheduler.add_job(daily_sync_job, 'interval', minutes=2)
+    scheduler.add_job(daily_sync_job, 'interval', minutes=5)
     scheduler.start()
     return scheduler
 
@@ -191,7 +191,7 @@ def show_disclaimer():
     button_placeholder = st.empty()
 
     if "disclaimer_timer_done" not in st.session_state:
-        for i in range(1, 0, -5):
+        for i in range(5, 0, -1):
             button_placeholder.button(f"กรุณาอ่านเงื่อนไข... ({i})", disabled=True, key=f"wait_{i}")
             time.sleep(1)
         

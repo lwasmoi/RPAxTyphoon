@@ -170,6 +170,10 @@ def retrieval_stage(
     # เก็บข้อมูลคู่กับคะแนน
     cand = []
     for idx in top_idx:
+        if idx >= len(target_data):
+            print(f"   [Warning] Index {idx} is out of range. DB has {len(target_data)} items.")
+            continue 
+            
         cand.append({
             "idx": int(idx),
             "id": _get_item_id(target_data[idx], idx),
