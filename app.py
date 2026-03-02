@@ -167,39 +167,71 @@ def init_scheduler():
 _ = init_scheduler()        
         
 
-@st.dialog("ข้อตกลงการใช้งาน")
+@st.dialog("คู่มือการใช้งานเบื้องต้น")
 def show_disclaimer():
+    # CSS ป้องกันการกดปิดและคลิกพื้นที่สีดำ
     st.markdown("""
         <style>
-            /* ซ่อนปุ่ม  X ใน  */
-            button[aria-label="Close"] {
-                display: none !important;
-            }
-            /* ป้องกันการคลิกพื้นที่สีดำรอบนอกเพื่อปิด (Overlay) */
-            div[data-testid="stModal"] {
-                pointer-events: none;
-            }
-            /* คืนค่าให้เนื้อหาข้างในคลิกได้ปกติ */
-            div[data-testid="stModal"] > div {
-                pointer-events: auto;
-            }
+            button[aria-label="Close"] { display: none !important; }
+            div[data-testid="stModal"] { pointer-events: none; }
+            div[data-testid="stModal"] > div { pointer-events: auto; }
         </style>
         """, unsafe_allow_html=True)
-    st.write("ระบบนี้เป็น AI สำหรับช่วยตอบคำถามการเบิกเงินและใบเสร็จ")
-    st.warning("กรุณากดปุ่ม  'เริ่มใหม่'  หากต้องการเริ่มคุยหัวข้อใหม่")
-    
-    button_placeholder = st.empty()
 
-    if "disclaimer_timer_done" not in st.session_state:
-        for i in range(5, 0, -1):
-            button_placeholder.button(f"กรุณาอ่านเงื่อนไข... ({i})", disabled=True, key=f"wait_{i}")
-            time.sleep(1)
+    if "tutorial_step" not in st.session_state:
+        st.session_state.tutorial_step = 1
+
+    step = st.session_state.tutorial_step
+
+    # แถบ Progress Bar บอกความคืบหน้า 
+    st.progress(step / 3, text=f"ขั้นตอนที่ {step}/3")
+    st.write("") 
+
+    # หน้าที่ 1
+    if step == 1:
+        st.subheader("1.วิธีการถามคำถาม")
+        st.write("สามารถพิมพ์คำถามที่สงสัย")
         
-        st.session_state.disclaimer_timer_done = True
-        st.rerun()
+        # จำลองหน้าตาแชทให้ดูเป็นตัวอย่าง 
+        with st.container(border=True):
+            with st.chat_message("user"):
+                st.write("รหัสใบเสร็จ RPA คืออะไร?")
+            with st.chat_message("assistant"):
+                st.write("รหัสใบเสร็จ RPA คือรหัส 10 หลักที่ใช้สำหรับอ้างอิงในระบบค่ะ...")
+                
+        st.info("หากไม่รู้จะเริ่มยังไงสามารถกดเลือกจาก 'คำถามแนะนำ' ครับ")
         
-    else:
-        if button_placeholder.button("ยอมรับเงื่อนไข", type="primary", key="accept_btn"):
+        st.write("") 
+        if st.button("ถัดไป", use_container_width=True):
+            st.session_state.tutorial_step = 2
+            st.rerun()
+
+    # หน้าที่ 2
+    elif step == 2:
+        st.subheader("2.แนะนำการถาม")
+        st.write("ลักษณะของคำถามต้องเกี่ยวข้องกับ ระบบ​ RPA")
+        
+        # ตีกรอบข้อมูลเพื่อเน้นย้ำ 
+        with st.container(border=True):
+            st.markdown("✅ **ข้อมูลที่บอทตอบได้:** เข้าสู่ระบบไม่ได้, ขั้นตอนอัปโหลดใบเสร็จ")
+            st.markdown("❌ **ข้อมูลที่บอทตอบไม่ได้:** เรื่องชีวิตประจำวัน, เรื่องทั่วไปอื่นๆ")
+        
+        st.write("")
+        if st.button("ถัดไป", use_container_width=True):
+            st.session_state.tutorial_step = 3
+            st.rerun()
+
+    # หน้าที่ 3 
+    elif step == 3:
+        st.subheader("3.ข้อควรระวังสำคัญ")
+        st.write("เพื่อไม่ให้ AI สับสนกับประวัติการคุยเก่าๆ")
+        
+        # เน้นปุ่มเริ่มใหม่ให้เห็นชัดๆ
+        with st.container(border=True):
+            st.warning("กรุณากดปุ่ม **'เริ่มใหม่' มุมขวาบน ** ทุกครั้ง หากต้องการเปลี่ยนไปคุยหัวข้ออื่นครับ")
+        
+        st.write("")
+        if st.button("รับทราบ เริ่มใช้งานเลย", type="primary", use_container_width=True):
             st.session_state.accepted_terms = True
             st.rerun()
 
